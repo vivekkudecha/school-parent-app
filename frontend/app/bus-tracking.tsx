@@ -7,12 +7,24 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useChildrenStore } from '../store/childrenStore';
 import { ArrowLeft, Bus, Home, School, Clock } from 'lucide-react-native';
+
+// Conditionally import MapView only on native platforms
+let MapView: any = null;
+let Marker: any = null;
+let PROVIDER_GOOGLE: any = null;
+
+if (Platform.OS !== 'web') {
+  const mapModule = require('react-native-maps');
+  MapView = mapModule.default;
+  Marker = mapModule.Marker;
+  PROVIDER_GOOGLE = mapModule.PROVIDER_GOOGLE;
+}
 
 const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 const { width, height } = Dimensions.get('window');
