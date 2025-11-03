@@ -33,6 +33,12 @@
           "resizeMode": "contain",
           "backgroundColor": "#000"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow EduTrack to use your location to track school bus."
+        }
       ]
     ],
     "experiments": {
