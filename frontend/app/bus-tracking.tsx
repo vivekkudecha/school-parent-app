@@ -98,55 +98,66 @@ export default function BusTrackingScreen() {
   return (
     <View style={styles.container}>
       {/* Map */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={{
-          latitude: schoolLocation.latitude,
-          longitude: schoolLocation.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-      >
-        {/* Bus Marker */}
-        {busLocation && (
+      {Platform.OS === 'web' ? (
+        <View style={[styles.map, styles.webMapPlaceholder]}>
+          <Text style={styles.webMapText}>
+            📱 Map view is available on mobile devices
+          </Text>
+          <Text style={styles.webMapSubtext}>
+            Please open this app in Expo Go on your phone to see live bus tracking
+          </Text>
+        </View>
+      ) : MapView ? (
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          provider={PROVIDER_GOOGLE}
+          initialRegion={{
+            latitude: schoolLocation.latitude,
+            longitude: schoolLocation.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+        >
+          {/* Bus Marker */}
+          {busLocation && (
+            <Marker
+              coordinate={{
+                latitude: busLocation.latitude,
+                longitude: busLocation.longitude,
+              }}
+              title="School Bus"
+              description={selectedChild.bus_info.bus_number}
+            >
+              <View style={styles.busMarker}>
+                <Bus size={24} color="#FFFFFF" />
+              </View>
+            </Marker>
+          )}
+
+          {/* School Marker */}
           <Marker
-            coordinate={{
-              latitude: busLocation.latitude,
-              longitude: busLocation.longitude,
-            }}
-            title="School Bus"
-            description={selectedChild.bus_info.bus_number}
+            coordinate={schoolLocation}
+            title="School"
+            description="Springfield Elementary"
           >
-            <View style={styles.busMarker}>
-              <Bus size={24} color="#FFFFFF" />
+            <View style={styles.schoolMarker}>
+              <School size={24} color="#FFFFFF" />
             </View>
           </Marker>
-        )}
 
-        {/* School Marker */}
-        <Marker
-          coordinate={schoolLocation}
-          title="School"
-          description="Springfield Elementary"
-        >
-          <View style={styles.schoolMarker}>
-            <School size={24} color="#FFFFFF" />
-          </View>
-        </Marker>
-
-        {/* Home Marker */}
-        <Marker
-          coordinate={selectedChild.home_location}
-          title="Home"
-          description={selectedChild.name}
-        >
-          <View style={styles.homeMarker}>
-            <Home size={24} color="#FFFFFF" />
-          </View>
-        </Marker>
-      </MapView>
+          {/* Home Marker */}
+          <Marker
+            coordinate={selectedChild.home_location}
+            title="Home"
+            description={selectedChild.name}
+          >
+            <View style={styles.homeMarker}>
+              <Home size={24} color="#FFFFFF" />
+            </View>
+          </Marker>
+        </MapView>
+      ) : null}
 
       {/* Header Overlay */}
       <SafeAreaView style={styles.headerOverlay}>
