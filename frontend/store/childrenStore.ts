@@ -1,26 +1,5 @@
 import { create } from 'zustand';
-
-export interface BusInfo {
-  bus_id: string;
-  bus_number: string;
-  driver_name: string;
-  route: string;
-  status: string;
-}
-
-export interface Child {
-  id: string;
-  name: string;
-  class_name: string;
-  section: string;
-  roll_number: string;
-  profile_image: string;
-  bus_info: BusInfo;
-  home_location: {
-    latitude: number;
-    longitude: number;
-  };
-}
+import { Child } from '@/types';
 
 interface ChildrenState {
   children: Child[];

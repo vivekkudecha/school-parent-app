@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '@/store/authStore';
 import { LogIn } from 'lucide-react-native';
-
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { EXPO_PUBLIC_BACKEND_URL, COLORS, DEMO_CREDENTIALS } from '@/constants/config';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('parent@school.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState(DEMO_CREDENTIALS.email);
+  const [password, setPassword] = useState(DEMO_CREDENTIALS.password);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
@@ -70,7 +69,7 @@ export default function LoginScreen() {
           {/* Logo/Header */}
           <View style={styles.header}>
             <View style={styles.iconContainer}>
-              <LogIn size={40} color="#007AFF" />
+              <LogIn size={40} color={COLORS.primary} />
             </View>
             <Text style={styles.title}>EduTrack</Text>
             <Text style={styles.subtitle}>Parent Portal</Text>
@@ -85,7 +84,7 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="parent@school.com"
-                placeholderTextColor="#999"
+                placeholderTextColor={COLORS.textLighter}
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
@@ -98,7 +97,7 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Enter your password"
-                placeholderTextColor="#999"
+                placeholderTextColor={COLORS.textLighter}
                 secureTextEntry
               />
             </View>
@@ -109,13 +108,13 @@ export default function LoginScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={COLORS.background} />
               ) : (
                 <Text style={styles.buttonText}>Login</Text>
               )}
             </TouchableOpacity>
 
-            <Text style={styles.hint}>Demo: parent@school.com / password123</Text>
+            <Text style={styles.hint}>Demo: {DEMO_CREDENTIALS.email} / {DEMO_CREDENTIALS.password}</Text>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -126,7 +125,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
   },
   keyboardView: {
     flex: 1,
@@ -144,7 +143,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -152,12 +151,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#222222',
+    color: COLORS.text,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: COLORS.textLight,
   },
   form: {
     width: '100%',
@@ -168,26 +167,26 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#222222',
+    color: COLORS.text,
     borderWidth: 1,
-    borderColor: '#E1E4E8',
+    borderColor: COLORS.border,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#007AFF',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -197,13 +196,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: COLORS.background,
     fontSize: 16,
     fontWeight: '600',
   },
   hint: {
     textAlign: 'center',
-    color: '#999',
+    color: COLORS.textLighter,
     fontSize: 12,
     marginTop: 16,
   },
