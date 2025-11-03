@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import {
   View,
   Text,
@@ -10,27 +10,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useChildrenStore } from '../store/childrenStore';
+import { useChildrenStore } from '@/store/childrenStore';
+import { BusLocation } from '@/types';
 import { ArrowLeft, Bus, Home, School, Clock, MapPin, Navigation } from 'lucide-react-native';
+import { EXPO_PUBLIC_BACKEND_URL, COLORS, SCHOOL_LOCATION, UPDATE_INTERVAL } from '@/constants/config';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 const { width, height } = Dimensions.get('window');
-
-interface BusLocation {
-  bus_id: string;
-  latitude: number;
-  longitude: number;
-  timestamp: string;
-  eta_minutes: number;
-  status: string;
-}
 
 export default function BusTrackingScreen() {
   const router = useRouter();
   const selectedChild = useChildrenStore((state) => state.selectedChild);
   const [busLocation, setBusLocation] = useState<BusLocation | null>(null);
   const [loading, setLoading] = useState(true);
-  const [schoolLocation] = useState({ latitude: 37.7749, longitude: -122.4194 });
 
   useEffect(() => {
     if (!selectedChild) {
@@ -39,7 +31,7 @@ export default function BusTrackingScreen() {
     }
 
     fetchBusLocation();
-    const interval = setInterval(fetchBusLocation, 10000); // Update every 10 seconds
+    const interval = setInterval(fetchBusLocation, UPDATE_INTERVAL);
 
     return () => clearInterval(interval);
   }, [selectedChild]);
@@ -75,7 +67,7 @@ export default function BusTrackingScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#222222" />
+          <ArrowLeft size={24} color={COLORS.text} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>Live Tracking</Text>
@@ -90,7 +82,7 @@ export default function BusTrackingScreen() {
         {/* Map Placeholder */}
         <View style={styles.mapPlaceholder}>
           <View style={styles.mapIconContainer}>
-            <Navigation size={48} color="#007AFF" />
+            <Navigation size={48} color={COLORS.primary} />
           </View>
           <Text style={styles.mapPlaceholderTitle}>Live Map Tracking</Text>
           <Text style={styles.mapPlaceholderSubtitle}>
@@ -98,7 +90,7 @@ export default function BusTrackingScreen() {
           </Text>
           <View style={styles.coordinatesContainer}>
             <View style={styles.coordinateItem}>
-              <Bus size={20} color="#007AFF" />
+              <Bus size={20} color={COLORS.primary} />
               <Text style={styles.coordinateLabel}>Bus Location</Text>
               <Text style={styles.coordinateValue}>
                 {busLocation ? `${busLocation.latitude.toFixed(4)}, ${busLocation.longitude.toFixed(4)}` : 'Loading...'}
@@ -110,21 +102,21 @@ export default function BusTrackingScreen() {
         {/* Location Cards */}
         <View style={styles.locationsContainer}>
           <View style={styles.locationCard}>
-            <View style={[styles.locationIcon, { backgroundColor: '#FF9500' }]}>
-              <School size={24} color="#FFFFFF" />
+            <View style={[styles.locationIcon, { backgroundColor: COLORS.warning }]}>
+              <School size={24} color={COLORS.background} />
             </View>
             <View style={styles.locationInfo}>
               <Text style={styles.locationLabel}>School</Text>
-              <Text style={styles.locationName}>Springfield Elementary</Text>
+              <Text style={styles.locationName}>{SCHOOL_LOCATION.name}</Text>
               <Text style={styles.locationCoords}>
-                {schoolLocation.latitude.toFixed(4)}, {schoolLocation.longitude.toFixed(4)}
+                {SCHOOL_LOCATION.latitude.toFixed(4)}, {SCHOOL_LOCATION.longitude.toFixed(4)}
               </Text>
             </View>
           </View>
 
           <View style={styles.locationCard}>
-            <View style={[styles.locationIcon, { backgroundColor: '#34C759' }]}>
-              <Home size={24} color="#FFFFFF" />
+            <View style={[styles.locationIcon, { backgroundColor: COLORS.success }]}>
+              <Home size={24} color={COLORS.background} />
             </View>
             <View style={styles.locationInfo}>
               <Text style={styles.locationLabel}>Home</Text>
@@ -139,7 +131,7 @@ export default function BusTrackingScreen() {
         {/* Bus Info Card */}
         <View style={styles.infoCard}>
           {loading ? (
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={COLORS.primary} />
           ) : busLocation ? (
             <>
               <View style={styles.infoHeader}>
@@ -152,7 +144,7 @@ export default function BusTrackingScreen() {
 
               <View style={styles.statsRow}>
                 <View style={styles.statItem}>
-                  <Clock size={24} color="#007AFF" />
+                  <Clock size={24} color={COLORS.primary} />
                   <Text style={styles.statLabel}>ETA</Text>
                   <Text style={styles.statValue}>{busLocation.eta_minutes} min</Text>
                 </View>
@@ -160,7 +152,7 @@ export default function BusTrackingScreen() {
                 <View style={styles.statDivider} />
 
                 <View style={styles.statItem}>
-                  <Bus size={24} color="#007AFF" />
+                  <Bus size={24} color={COLORS.primary} />
                   <Text style={styles.statLabel}>Status</Text>
                   <Text style={styles.statValue}>{busLocation.status}</Text>
                 </View>
@@ -168,7 +160,7 @@ export default function BusTrackingScreen() {
                 <View style={styles.statDivider} />
 
                 <View style={styles.statItem}>
-                  <MapPin size={24} color="#007AFF" />
+                  <MapPin size={24} color={COLORS.primary} />
                   <Text style={styles.statLabel}>Route</Text>
                   <Text style={styles.statValueSmall}>Tracking</Text>
                 </View>
@@ -216,7 +208,7 @@ export default function BusTrackingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -225,13 +217,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F6F8FA',
+    borderBottomColor: COLORS.secondary,
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -242,11 +234,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textLight,
     marginTop: 2,
   },
   placeholder: {
@@ -256,7 +248,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mapPlaceholder: {
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     margin: 16,
     borderRadius: 20,
     padding: 32,
@@ -266,7 +258,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -274,20 +266,20 @@ const styles = StyleSheet.create({
   mapPlaceholderTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
     marginBottom: 8,
     textAlign: 'center',
   },
   mapPlaceholderSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textLight,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
   },
   coordinatesContainer: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     borderRadius: 12,
     padding: 16,
   },
@@ -296,14 +288,14 @@ const styles = StyleSheet.create({
   },
   coordinateLabel: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textLight,
     marginTop: 8,
     marginBottom: 4,
   },
   coordinateValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
   },
   locationsContainer: {
     paddingHorizontal: 16,
@@ -311,7 +303,7 @@ const styles = StyleSheet.create({
   },
   locationCard: {
     flexDirection: 'row',
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -329,21 +321,21 @@ const styles = StyleSheet.create({
   },
   locationLabel: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textLight,
     marginBottom: 4,
   },
   locationName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
     marginBottom: 4,
   },
   locationCoords: {
     fontSize: 12,
-    color: '#999',
+    color: COLORS.textLighter,
   },
   infoCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.background,
     marginHorizontal: 16,
     borderRadius: 20,
     padding: 20,
@@ -363,12 +355,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -377,13 +369,13 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#34C759',
+    backgroundColor: COLORS.success,
     marginRight: 6,
   },
   liveText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#34C759',
+    color: COLORS.success,
   },
   statsRow: {
     flexDirection: 'row',
@@ -395,28 +387,28 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: COLORS.textLight,
     marginTop: 8,
     marginBottom: 4,
   },
   statValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
   },
   statValueSmall: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
   },
   statDivider: {
     width: 1,
-    backgroundColor: '#E1E4E8',
+    backgroundColor: COLORS.border,
     marginHorizontal: 12,
   },
   detailsSection: {
     borderTopWidth: 1,
-    borderTopColor: '#F6F8FA',
+    borderTopColor: COLORS.secondary,
     paddingTop: 16,
   },
   detailRow: {
@@ -426,19 +418,19 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textLight,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
     textAlign: 'right',
     flex: 1,
     marginLeft: 16,
   },
   errorText: {
     fontSize: 16,
-    color: '#FF3B30',
+    color: COLORS.error,
     textAlign: 'center',
   },
   noteCard: {

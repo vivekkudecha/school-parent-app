@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuthStore } from '../store/authStore';
-import { useChildrenStore, Child } from '../store/childrenStore';
+import { useAuthStore } from '@/store/authStore';
+import { useChildrenStore } from '@/store/childrenStore';
+import { Child } from '@/types';
 import { Users, LogOut, Bus } from 'lucide-react-native';
-
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { EXPO_PUBLIC_BACKEND_URL, COLORS } from '@/constants/config';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -81,7 +82,7 @@ export default function DashboardScreen() {
             {item.class_name} - Section {item.section}
           </Text>
           <View style={styles.busStatus}>
-            <Bus size={16} color="#007AFF" />
+            <Bus size={16} color={COLORS.primary} />
             <Text style={styles.busStatusText}>{item.bus_info.status}</Text>
           </View>
         </View>
@@ -90,14 +91,7 @@ export default function DashboardScreen() {
   );
 
   if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading children...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingSpinner message="Loading children..." />;
   }
 
   return (
@@ -112,14 +106,14 @@ export default function DashboardScreen() {
           style={styles.logoutButton}
           onPress={handleLogout}
         >
-          <LogOut size={24} color="#666" />
+          <LogOut size={24} color={COLORS.textLight} />
         </TouchableOpacity>
       </View>
 
       {/* Children List */}
       <View style={styles.listContainer}>
         <View style={styles.sectionHeader}>
-          <Users size={24} color="#222222" />
+          <Users size={24} color={COLORS.text} />
           <Text style={styles.sectionTitle}>Your Children</Text>
         </View>
         
@@ -144,17 +138,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -165,19 +149,19 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textLight,
   },
   userName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#222222',
+    color: COLORS.text,
     marginTop: 4,
   },
   logoutButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -193,14 +177,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
     marginLeft: 8,
   },
   listContent: {
     paddingBottom: 24,
   },
   card: {
-    backgroundColor: '#F6F8FA',
+    backgroundColor: COLORS.secondary,
     borderRadius: 20,
     marginBottom: 16,
     shadowColor: '#000',
@@ -218,7 +202,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#E1E4E8',
+    backgroundColor: COLORS.border,
   },
   cardInfo: {
     flex: 1,
@@ -227,12 +211,12 @@ const styles = StyleSheet.create({
   childName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#222222',
+    color: COLORS.text,
     marginBottom: 4,
   },
   classInfo: {
     fontSize: 14,
-    color: '#666',
+    color: COLORS.textLight,
     marginBottom: 8,
   },
   busStatus: {
@@ -241,7 +225,7 @@ const styles = StyleSheet.create({
   },
   busStatusText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: COLORS.primary,
     fontWeight: '500',
     marginLeft: 6,
   },
@@ -253,6 +237,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: COLORS.textLighter,
   },
 });
