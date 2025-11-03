@@ -239,6 +239,25 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
   },
+  webMapPlaceholder: {
+    backgroundColor: '#F6F8FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  webMapText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#222222',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  webMapSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   headerOverlay: {
     position: 'absolute',
     top: 0,
