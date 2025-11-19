@@ -1,134 +1,135 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useChildrenStore } from '@/store/childrenStore';
-import { Child } from '@/types';
-import { Users, LogOut, Bus } from 'lucide-react-native';
-import { EXPO_PUBLIC_BACKEND_URL, COLORS } from '@/constants/config';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { KidProfile } from '@/types';
+import { Users, LogOut, RefreshCw } from 'lucide-react-native';
+import { COLORS } from '@/constants/config';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const { children, setChildren, setSelectedChild } = useChildrenStore();
-  const [loading, setLoading] = useState(true);
+  const { 
+    kidsProfiles, 
+    selectedKidProfile, 
+    setSelectedKidProfile 
+  } = useChildrenStore();
 
   useEffect(() => {
     if (!user) {
       router.replace('/');
       return;
     }
-    fetchChildren();
-  }, [user]);
-
-  const fetchChildren = async () => {
-    if (!user) return;
-
-    try {
-      const response = await fetch(
-        `${EXPO_PUBLIC_BACKEND_URL}/api/children/${user.parentId}`
-      );
-      const data = await response.json();
-
-      if (response.ok) {
-        setChildren(data);
-      } else {
-        Alert.alert('Error', 'Unable to fetch children data');
-      }
-    } catch (error) {
-      console.error('Fetch children error:', error);
-      Alert.alert('Error', 'Unable to connect to server');
-    } finally {
-      setLoading(false);
+    // Kids profiles are already stored from login response
+    // If only one kid and none selected, auto-select it
+    if (kidsProfiles.length === 1 && !selectedKidProfile) {
+      setSelectedKidProfile(kidsProfiles[0]);
     }
-  };
+  }, [user, kidsProfiles, selectedKidProfile]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.replace('/');
   };
 
-  const handleChildPress = (child: Child) => {
-    setSelectedChild(child);
-    router.push('/child-profile');
+  const handleSwitchKid = () => {
+    router.push('/select-kid');
   };
 
-  const renderChildCard = ({ item }: { item: Child }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => handleChildPress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardContent}>
-        <Image
-          source={{ uri: item.profile_image }}
-          style={styles.avatar}
-        />
-        <View style={styles.cardInfo}>
-          <Text style={styles.childName}>{item.name}</Text>
-          <Text style={styles.classInfo}>
-            {item.class_name} - Section {item.section}
-          </Text>
-          <View style={styles.busStatus}>
-            <Bus size={16} color={COLORS.primary} />
-            <Text style={styles.busStatusText}>{item.bus_info.status}</Text>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  const getFullName = (kid: KidProfile) => {
+    const parts = [kid.first_name, kid.middle_name, kid.last_name].filter(Boolean);
+    return parts.join(' ');
+  };
 
-  if (loading) {
-    return <LoadingSpinner message="Loading children..." />;
-  }
+  const showSwitchKidIcon = kidsProfiles.length > 1;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Welcome back,</Text>
           <Text style={styles.userName}>{user?.name}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
-          <LogOut size={24} color={COLORS.textLight} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {showSwitchKidIcon && (
+            <TouchableOpacity
+              style={styles.switchKidButton}
+              onPress={handleSwitchKid}
+            >
+              <RefreshCw size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+          >
+            <LogOut size={24} color={COLORS.textLight} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Children List */}
+      {/* Selected Kid Profile */}
       <View style={styles.listContainer}>
         <View style={styles.sectionHeader}>
           <Users size={24} color={COLORS.text} />
-          <Text style={styles.sectionTitle}>Your Children</Text>
+          <Text style={styles.sectionTitle}>
+            {selectedKidProfile ? 'Selected Child' : 'Your Children'}
+          </Text>
         </View>
         
-        {children.length === 0 ? (
+        {selectedKidProfile ? (
+          <View style={styles.selectedKidCard}>
+            <View style={styles.cardContent}>
+              {selectedKidProfile.photo ? (
+                <Image
+                  source={{ uri: selectedKidProfile.photo }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarText}>
+                    {selectedKidProfile.first_name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.cardInfo}>
+                <Text style={styles.childName}>
+                  {getFullName(selectedKidProfile)}
+                </Text>
+                <Text style={styles.classInfo}>
+                  Grade {selectedKidProfile.grade_name}
+                  {selectedKidProfile.division && ` - ${selectedKidProfile.division}`}
+                </Text>
+                <Text style={styles.academicYear}>
+                  Academic Year: {selectedKidProfile.academic_year}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : kidsProfiles.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No children found</Text>
+            <Text style={styles.emptyText}>No children profiles found</Text>
           </View>
         ) : (
-          <FlatList
-            data={children}
-            renderItem={renderChildCard}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>Please select a child profile</Text>
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={handleSwitchKid}
+            >
+              <Text style={styles.selectButtonText}>Select Child</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </SafeAreaView>
@@ -147,6 +148,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
   },
+  headerLeft: {
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   greeting: {
     fontSize: 14,
     color: COLORS.textLight,
@@ -156,6 +165,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
     marginTop: 4,
+  },
+  switchKidButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   logoutButton: {
     width: 44,
@@ -180,14 +199,11 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginLeft: 8,
   },
-  listContent: {
-    paddingBottom: 24,
-  },
-  card: {
+  selectedKidCard: {
     backgroundColor: COLORS.secondary,
     borderRadius: 20,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -204,6 +220,16 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: COLORS.border,
   },
+  avatarPlaceholder: {
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.background,
+  },
   cardInfo: {
     flex: 1,
     marginLeft: 16,
@@ -217,17 +243,11 @@ const styles = StyleSheet.create({
   classInfo: {
     fontSize: 14,
     color: COLORS.textLight,
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  busStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  busStatusText: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '500',
-    marginLeft: 6,
+  academicYear: {
+    fontSize: 12,
+    color: COLORS.textLighter,
   },
   emptyContainer: {
     flex: 1,
@@ -238,5 +258,18 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: COLORS.textLighter,
+    marginBottom: 16,
+  },
+  selectButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 8,
+  },
+  selectButtonText: {
+    color: COLORS.background,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

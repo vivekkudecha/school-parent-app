@@ -10,7 +10,13 @@ export const COLORS = {
   border: '#E1E4E8',
   success: '#34C759',
   error: '#FF3B30',
+  errorLight: '#FFEBEE',
   warning: '#FF9500',
+  black: '#000000',
+  shadow: '#000000',
+  infoLight: '#E3F2FD',
+  info: '#1976D2',
+  infoDark: '#1565C0',
 };
 
 export const DEMO_CREDENTIALS = {

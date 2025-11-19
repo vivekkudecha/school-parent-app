@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 12,
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   noteCard: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: COLORS.infoLight,
     marginHorizontal: 16,
     marginBottom: 32,
     borderRadius: 16,
@@ -443,12 +443,12 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1976D2',
+    color: COLORS.info,
     marginBottom: 8,
   },
   noteText: {
     fontSize: 14,
-    color: '#1565C0',
+    color: COLORS.infoDark,
     lineHeight: 20,
   },
 });
