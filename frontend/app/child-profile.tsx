@@ -41,7 +41,6 @@ export default function ChildProfileScreen() {
           }
           
           const data = await studentAPI.getProfile(userId);
-          console.log('Profile data received:', JSON.stringify(data, null, 2));
           const profileWithId = { ...data, studentId: userId };
           setProfile(profileWithId);
         } else {
