@@ -37,7 +37,7 @@ export default function SelectKidScreen() {
 
   const handleSelectKid = async (kid: KidProfile) => {
     await setSelectedKidProfile(kid);
-    router.replace('/dashboard');
+    router.push('/dashboard');
   };
 
   const getFullName = (kid: KidProfile) => {

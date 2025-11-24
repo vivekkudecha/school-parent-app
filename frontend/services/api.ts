@@ -64,5 +64,21 @@ export const authAPI = {
   // The kids_profile array from login response is stored in AsyncStorage and used throughout the app
 };
 
+export const studentAPI = {
+  getProfile: async (userId: number) => {
+    try {
+      const response = await apiClient.get(`/student-profile`, {
+        params: {
+          user_id: userId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Student API error:', error);
+      throw error;
+    }
+  },
+};
+
 export default apiClient;
 

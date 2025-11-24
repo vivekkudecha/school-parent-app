@@ -50,29 +50,131 @@ export default function LoginScreen() {
       // Store auth data
       await setAuth(data);
 
-      // Store kids profiles
+      // Store kids profiles (this saves to AsyncStorage)
       await setKidsProfiles(data.kids_profile);
 
       // Handle navigation based on kids profile count
       if (data.kids_profile.length === 0) {
-        // No kids profile - go to dashboard
+        // No kids profile - clear selected profile and go to dashboard
+        await setSelectedKidProfile(null); // Clear selection
         router.replace('/dashboard');
       } else if (data.kids_profile.length === 1) {
-        // Single kid - auto-select and go to dashboard
+        // Single kid - auto-select and save, then go to dashboard
         await setSelectedKidProfile(data.kids_profile[0]);
         router.replace('/dashboard');
-
       } else {
-        // Multiple kids - go to selection screen
+        // Multiple kids - clear previous selection and go to selection screen
+        // User will select from the list
+        await setSelectedKidProfile(null); // Clear previous selection
         router.replace('/select-kid');
       }
 
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'Login failed. Please check your credentials and try again.';
+      console.error('Error response data:', error.response?.data);
+      
+      let errorMessage = 'Login failed. Please check your credentials and try again.';
+      
+      // Handle Axios errors
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        // Log full response for debugging
+        console.log('Full error response:', JSON.stringify(data, null, 2));
+        
+        // Handle different error response formats - check multiple possible fields
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data?.detail) {
+          // Handle detail field (common in FastAPI/DRF)
+          if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map((item: any) => {
+              if (typeof item === 'object' && item.msg) return item.msg;
+              if (typeof item === 'object' && item.message) return item.message;
+              return String(item);
+            }).join(', ');
+          } else if (typeof data.detail === 'object' && data.detail.msg) {
+            errorMessage = data.detail.msg;
+          } else {
+            errorMessage = String(data.detail);
+          }
+        } else if (data?.message) {
+          // Handle message field
+          errorMessage = Array.isArray(data.message) 
+            ? data.message.join(', ') 
+            : String(data.message);
+        } else if (data?.msg) {
+          // Handle msg field
+          errorMessage = Array.isArray(data.msg) 
+            ? data.msg.join(', ') 
+            : String(data.msg);
+        } else if (data?.error) {
+          // Handle error field
+          if (typeof data.error === 'object' && data.error.message) {
+            errorMessage = data.error.message;
+          } else if (typeof data.error === 'object' && data.error.msg) {
+            errorMessage = data.error.msg;
+          } else {
+            errorMessage = Array.isArray(data.error) 
+              ? data.error.join(', ') 
+              : String(data.error);
+          }
+        } else if (data?.errors) {
+          // Handle errors array/object
+          if (Array.isArray(data.errors)) {
+            errorMessage = data.errors.join(', ');
+          } else if (typeof data.errors === 'object') {
+            const errorList = Object.entries(data.errors)
+              .map(([key, value]) => {
+                if (Array.isArray(value)) {
+                  return value.join(', ');
+                }
+                return String(value);
+              })
+              .join('; ');
+            errorMessage = errorList || 'Validation error occurred.';
+          }
+        } else if (typeof data === 'object' && data !== null) {
+          // Handle field-specific validation errors (e.g., {"password": ["error message"]})
+          // Check if data has field names as keys (common in DRF validation errors)
+          const fieldErrors = Object.entries(data)
+            .filter(([key]) => !['detail', 'message', 'msg', 'error', 'errors'].includes(key))
+            .map(([key, value]) => {
+              if (Array.isArray(value)) {
+                return value.join(', ');
+              }
+              return String(value);
+            });
+          
+          if (fieldErrors.length > 0) {
+            errorMessage = fieldErrors.join('; ');
+          }
+        }
+        
+        // If no error message extracted yet, use status-based defaults
+        if (errorMessage === 'Login failed. Please check your credentials and try again.') {
+          if (status === 400) {
+            errorMessage = 'Invalid username or password. Please check your credentials and try again.';
+          } else if (status === 401) {
+            errorMessage = 'Authentication failed. Please check your credentials.';
+          } else if (status === 403) {
+            errorMessage = 'Access denied. Please contact your administrator.';
+          } else if (status === 404) {
+            errorMessage = 'Service not found. Please try again later.';
+          } else if (status >= 500) {
+            errorMessage = 'Server error. Please try again later.';
+          } else {
+            errorMessage = `Login failed (Error ${status}). Please try again.`;
+          }
+        }
+      } else if (error.request) {
+        // Network error - no response received
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setStatus(errorMessage);
       setFieldError('password', '');
     } finally {
@@ -182,7 +284,11 @@ export default function LoginScreen() {
                 </View>
 
                 {/* Forgot Password Link */}
-                <TouchableOpacity style={styles.forgotPasswordContainer}>
+                <TouchableOpacity 
+                  style={styles.forgotPasswordContainer}
+                  onPress={() => router.push('/forgot-password')}
+                  activeOpacity={0.7}
+                >
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
 

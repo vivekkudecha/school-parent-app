@@ -8,9 +8,10 @@ interface ChildrenState {
   children: Child[];
   selectedChild: Child | null;
   setKidsProfiles: (profiles: KidProfile[]) => Promise<void>;
-  setSelectedKidProfile: (profile: KidProfile) => Promise<void>;
+  setSelectedKidProfile: (profile: KidProfile | null) => Promise<void>;
   setChildren: (children: Child[]) => void;
   setSelectedChild: (child: Child) => void;
+  clearChildren: () => Promise<void>;
   initializeKids: () => Promise<void>;
 }
 
@@ -30,10 +31,17 @@ export const useChildrenStore = create<ChildrenState>((set) => ({
     }
   },
   
-  setSelectedKidProfile: async (profile: KidProfile) => {
+  setSelectedKidProfile: async (profile: KidProfile | null) => {
     try {
-      await AsyncStorage.setItem('selected_kid_profile', JSON.stringify(profile));
-      set({ selectedKidProfile: profile });
+      if (profile === null) {
+        // Clear the selected profile
+        await AsyncStorage.removeItem('selected_kid_profile');
+        set({ selectedKidProfile: null });
+      } else {
+        // Save the selected profile
+        await AsyncStorage.setItem('selected_kid_profile', JSON.stringify(profile));
+        set({ selectedKidProfile: profile });
+      }
     } catch (error) {
       console.error('Error saving selected kid profile:', error);
       set({ selectedKidProfile: profile });
@@ -42,6 +50,27 @@ export const useChildrenStore = create<ChildrenState>((set) => ({
   
   setChildren: (children) => set({ children }),
   setSelectedChild: (child) => set({ selectedChild: child }),
+  
+  clearChildren: async () => {
+    try {
+      await AsyncStorage.multiRemove(['kids_profiles', 'selected_kid_profile']);
+      set({
+        kidsProfiles: [],
+        selectedKidProfile: null,
+        children: [],
+        selectedChild: null,
+      });
+    } catch (error) {
+      console.error('Error clearing children data:', error);
+      // Still clear the state even if AsyncStorage fails
+      set({
+        kidsProfiles: [],
+        selectedKidProfile: null,
+        children: [],
+        selectedChild: null,
+      });
+    }
+  },
   
   initializeKids: async () => {
     try {

@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -11,6 +11,8 @@ export default function RootLayout() {
   const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
   const segments = useSegments();
+  const prevAuthenticatedRef = useRef<boolean | null>(null);
+  const hasHandledInitialNavigationRef = useRef(false);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const initializeKids = useChildrenStore((state) => state.initializeKids);
@@ -57,47 +59,62 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isInitialized) return;
 
+    const currentSegment = segments[0];
+    const justBecameAuthenticated = prevAuthenticatedRef.current === false && isAuthenticated === true;
+    const isFirstCheck = prevAuthenticatedRef.current === null;
+    
+    // Update previous auth state
+    prevAuthenticatedRef.current = isAuthenticated;
+
     if (isAuthenticated) {
-      // Navigate based on kids profiles
-      const currentKidsProfiles = useChildrenStore.getState().kidsProfiles;
-      const currentSelectedKid = useChildrenStore.getState().selectedKidProfile;
-      
-      if (currentKidsProfiles.length === 0) {
-        // No kids - go to dashboard
-        if (segments[0] !== 'dashboard') {
+      // Only navigate on app initialization (when app opens and user is already logged in)
+      // Don't navigate after fresh login - let login screen handle its own navigation
+      // Don't navigate if already on a valid authenticated screen (allows back navigation)
+      const isOnLoginScreen = !currentSegment;
+      if (!hasHandledInitialNavigationRef.current && 
+          isOnLoginScreen && 
+          !justBecameAuthenticated) {
+        // App opened with user already logged in - navigate based on kids
+        hasHandledInitialNavigationRef.current = true;
+        
+        if (kidsProfiles.length === 0) {
+          // No kids - go to dashboard
           router.replace('/dashboard');
-        }
-      } else if (currentKidsProfiles.length === 1) {
-        // Single kid - auto-select if not selected
-        if (!currentSelectedKid) {
-          setSelectedKidProfile(currentKidsProfiles[0]);
-        }
-        if (segments[0] !== 'dashboard') {
-          router.replace('/dashboard');
-        }
-      } else {
-        // Multiple kids
-        if (!currentSelectedKid) {
-          // No kid selected - go to selection screen
-          if (segments[0] !== 'select-kid') {
-            router.replace('/select-kid');
+        } else if (kidsProfiles.length === 1) {
+          // Single kid - auto-select if not selected
+          if (!selectedKidProfile) {
+            setSelectedKidProfile(kidsProfiles[0]);
           }
+          router.replace('/dashboard');
         } else {
-          // Kid selected - go to dashboard
-          if (segments[0] !== 'dashboard') {
-            router.replace('/dashboard');
-          }
+          // Multiple kids - go to select-kid screen
+          router.replace('/select-kid');
         }
+      } else if (currentSegment === 'forgot-password') {
+        // Allow forgot-password screen to stay
+        return;
+      } else if (kidsProfiles.length === 1 && currentSegment === 'select-kid') {
+        // If only one kid but on select-kid, redirect to dashboard
+        if (!selectedKidProfile) {
+          setSelectedKidProfile(kidsProfiles[0]);
+        }
+        router.replace('/dashboard');
+      } else if (kidsProfiles.length === 0 && currentSegment === 'select-kid') {
+        // If no kids but on select-kid, redirect to dashboard
+        router.replace('/dashboard');
       }
+      // Allow other screens (dashboard, select-kid, child-profile, bus-tracking) to stay
+      // This enables back navigation from dashboard to select-kid
+      // Don't force navigation away from these screens - let user navigate freely
     } else {
-      // User is not authenticated - redirect to login if on protected routes
-      const currentSegment = segments[0];
+      // User is not authenticated - reset navigation flag and redirect to login if on protected routes
+      hasHandledInitialNavigationRef.current = false;
       const protectedRoutes = ['dashboard', 'select-kid', 'child-profile', 'bus-tracking'];
       if (currentSegment && protectedRoutes.includes(currentSegment)) {
         router.replace('/');
       }
     }
-  }, [isInitialized, isAuthenticated, segments]);
+  }, [isInitialized, isAuthenticated, kidsProfiles.length, selectedKidProfile, segments]);
 
   if (!isInitialized) {
     return (

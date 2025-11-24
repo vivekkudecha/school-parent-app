@@ -88,3 +88,66 @@ export interface BusLocation {
   eta_minutes: number;
   status: string;
 }
+
+export interface ParentContactNumber {
+  id: number;
+  country_code: string;
+  contact_number: string;
+  is_primary_contact: boolean;
+  created: string;
+  updated: string;
+  parent: number;
+}
+
+export interface ParentEmail {
+  id: number;
+  email: string;
+  is_primary_email: boolean;
+  created: string;
+  updated: string;
+  parent: number;
+}
+
+export interface ParentGuardian {
+  id: number;
+  contact_numbers: ParentContactNumber[];
+  emails: ParentEmail[];
+  photo: string | null;
+  relation: string;
+  relation_other: string | null;
+  full_name: string;
+  address: string;
+  education_qualification: string;
+  occupation: string;
+  working_designation: string;
+  workplace_address: string;
+  workplace_contact: string;
+  annual_income: number | null;
+  is_primary_emergency_contact: boolean;
+  created: string;
+  updated: string;
+  login_enable: boolean;
+  user_name: string | null;
+  password: string | null;
+  use_existing_user: boolean;
+  user: number;
+  perent_user: number | null;
+}
+
+export interface StudentProfile {
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  birthday: string;
+  address: string;
+  country_code: string;
+  phone: string;
+  grade_name: string;
+  division: string;
+  academic_year: number;
+  photo: string;
+  rte: boolean;
+  house_name: string;
+  house_color: string;
+  perents_guardians: ParentGuardian[];
+}

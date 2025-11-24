@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useChildrenStore } from '@/store/childrenStore';
 import { KidProfile } from '@/types';
-import { Users, LogOut, RefreshCw } from 'lucide-react-native';
+import { Users, LogOut, RefreshCw, User } from 'lucide-react-native';
 import { COLORS } from '@/constants/config';
 
 export default function DashboardScreen() {
@@ -21,7 +21,8 @@ export default function DashboardScreen() {
   const { 
     kidsProfiles, 
     selectedKidProfile, 
-    setSelectedKidProfile 
+    setSelectedKidProfile,
+    clearChildren 
   } = useChildrenStore();
 
   useEffect(() => {
@@ -37,12 +38,23 @@ export default function DashboardScreen() {
   }, [user, kidsProfiles, selectedKidProfile]);
 
   const handleLogout = async () => {
+    // Clear children data (selected profile, kids profiles, etc.)
+    await clearChildren();
+    // Clear auth data
     await logout();
     router.replace('/');
   };
 
   const handleSwitchKid = () => {
     router.push('/select-kid');
+  };
+
+  const handleViewProfile = () => {
+    if (selectedKidProfile) {
+      // Store the student ID for the profile screen to fetch data
+      // The profile screen will fetch data using this student ID
+      router.push(`/child-profile?student_id=${selectedKidProfile.student}`);
+    }
   };
 
   const getFullName = (kid: KidProfile) => {
@@ -81,10 +93,22 @@ export default function DashboardScreen() {
       {/* Selected Kid Profile */}
       <View style={styles.listContainer}>
         <View style={styles.sectionHeader}>
-          <Users size={24} color={COLORS.text} />
-          <Text style={styles.sectionTitle}>
-            {selectedKidProfile ? 'Selected Child' : 'Your Children'}
-          </Text>
+          <View style={styles.sectionHeaderLeft}>
+            <Users size={24} color={COLORS.text} />
+            <Text style={styles.sectionTitle}>
+              {selectedKidProfile ? 'Selected Child' : 'Your Children'}
+            </Text>
+          </View>
+          {selectedKidProfile && (
+            <TouchableOpacity
+              style={styles.viewKidsProfileButton}
+              onPress={() => router.push('/child-profile')}
+              activeOpacity={0.7}
+            >
+              <User size={18} color={COLORS.background} />
+              <Text style={styles.viewKidsProfileButtonText}>View Profiles</Text>
+            </TouchableOpacity>
+          )}
         </View>
         
         {selectedKidProfile ? (
@@ -115,6 +139,14 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             </View>
+            <TouchableOpacity
+              style={styles.viewProfileButton}
+              onPress={handleViewProfile}
+              activeOpacity={0.7}
+            >
+              <User size={18} color={COLORS.primary} />
+              <Text style={styles.viewProfileButtonText}>View Profile</Text>
+            </TouchableOpacity>
           </View>
         ) : kidsProfiles.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -191,13 +223,38 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.text,
     marginLeft: 8,
+  },
+  viewKidsProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    gap: 6,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  viewKidsProfileButtonText: {
+    color: COLORS.background,
+    fontSize: 14,
+    fontWeight: '600',
   },
   selectedKidCard: {
     backgroundColor: COLORS.secondary,
@@ -208,6 +265,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    overflow: 'hidden',
   },
   cardContent: {
     flexDirection: 'row',
@@ -269,6 +327,22 @@ const styles = StyleSheet.create({
   },
   selectButtonText: {
     color: COLORS.background,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  viewProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.background,
+    gap: 8,
+  },
+  viewProfileButtonText: {
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '600',
   },
