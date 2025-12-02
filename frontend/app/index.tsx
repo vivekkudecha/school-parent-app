@@ -53,21 +53,15 @@ export default function LoginScreen() {
       // Store kids profiles (this saves to AsyncStorage)
       await setKidsProfiles(data.kids_profile);
 
-      // Handle navigation based on kids profile count
-      if (data.kids_profile.length === 0) {
-        // No kids profile - clear selected profile and go to dashboard
-        await setSelectedKidProfile(null); // Clear selection
-        router.replace('/dashboard');
-      } else if (data.kids_profile.length === 1) {
-        // Single kid - auto-select and save, then go to dashboard
+      // Always select first kid (if available) and go to dashboard
+      if (data.kids_profile.length > 0) {
+        // Auto-select first kid
         await setSelectedKidProfile(data.kids_profile[0]);
-        router.replace('/dashboard');
       } else {
-        // Multiple kids - clear previous selection and go to selection screen
-        // User will select from the list
-        await setSelectedKidProfile(null); // Clear previous selection
-        router.replace('/select-kid');
+        // No kids - clear selected profile
+        await setSelectedKidProfile(null);
       }
+      router.replace('/(tabs)/dashboard');
 
     } catch (error: any) {
       console.error('Login error:', error);

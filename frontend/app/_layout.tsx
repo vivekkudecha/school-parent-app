@@ -2,9 +2,11 @@ import React, { Suspense, useEffect, useState, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StatusBar } from 'expo-status-bar';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useAuthStore } from '@/store/authStore';
 import { useChildrenStore } from '@/store/childrenStore';
+import { setLogoutHandler } from '@/services/api';
 
 
 export default function RootLayout() {
@@ -15,11 +17,29 @@ export default function RootLayout() {
   const hasHandledInitialNavigationRef = useRef(false);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const logout = useAuthStore((state) => state.logout);
+  const clearChildren = useChildrenStore((state) => state.clearChildren);
   const initializeKids = useChildrenStore((state) => state.initializeKids);
   const kidsProfiles = useChildrenStore((state) => state.kidsProfiles);
   const selectedKidProfile = useChildrenStore((state) => state.selectedKidProfile);
   const setKidsProfiles = useChildrenStore((state) => state.setKidsProfiles);
   const setSelectedKidProfile = useChildrenStore((state) => state.setSelectedKidProfile);
+
+  // Set up global logout handler for API interceptor
+  useEffect(() => {
+    const handleLogout = async () => {
+      try {
+        await logout();
+        await clearChildren();
+        router.replace('/');
+      } catch (error) {
+        console.error('Error during logout:', error);
+        router.replace('/');
+      }
+    };
+
+    setLogoutHandler(handleLogout);
+  }, [logout, clearChildren, router]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -46,11 +66,11 @@ export default function RootLayout() {
     if (isAuthenticated) {
       // Kids profiles are already stored from login response in AsyncStorage
       // They are initialized via initializeKids() which is called in the first useEffect
-      // If only one kid and none selected, auto-select it
+      // Auto-select first kid if available and none selected
       const currentKidsProfiles = useChildrenStore.getState().kidsProfiles;
       const currentSelected = useChildrenStore.getState().selectedKidProfile;
       
-      if (currentKidsProfiles.length === 1 && !currentSelected) {
+      if (currentKidsProfiles.length > 0 && !currentSelected) {
         setSelectedKidProfile(currentKidsProfiles[0]);
       }
     }
@@ -61,7 +81,6 @@ export default function RootLayout() {
 
     const currentSegment = segments[0];
     const justBecameAuthenticated = prevAuthenticatedRef.current === false && isAuthenticated === true;
-    const isFirstCheck = prevAuthenticatedRef.current === null;
     
     // Update previous auth state
     prevAuthenticatedRef.current = isAuthenticated;
@@ -74,42 +93,31 @@ export default function RootLayout() {
       if (!hasHandledInitialNavigationRef.current && 
           isOnLoginScreen && 
           !justBecameAuthenticated) {
-        // App opened with user already logged in - navigate based on kids
+        // App opened with user already logged in - always go to dashboard
         hasHandledInitialNavigationRef.current = true;
         
-        if (kidsProfiles.length === 0) {
-          // No kids - go to dashboard
-          router.replace('/dashboard');
-        } else if (kidsProfiles.length === 1) {
-          // Single kid - auto-select if not selected
-          if (!selectedKidProfile) {
-            setSelectedKidProfile(kidsProfiles[0]);
-          }
-          router.replace('/dashboard');
-        } else {
-          // Multiple kids - go to select-kid screen
-          router.replace('/select-kid');
+        // Auto-select first kid if available and none selected
+        if (kidsProfiles.length > 0 && !selectedKidProfile) {
+          setSelectedKidProfile(kidsProfiles[0]);
         }
+        
+        router.replace('/(tabs)/dashboard');
       } else if (currentSegment === 'forgot-password') {
         // Allow forgot-password screen to stay
         return;
-      } else if (kidsProfiles.length === 1 && currentSegment === 'select-kid') {
-        // If only one kid but on select-kid, redirect to dashboard
-        if (!selectedKidProfile) {
+      } else if (currentSegment === 'select-kid') {
+        // Redirect from select-kid to dashboard (select-kid screen removed)
+        if (kidsProfiles.length > 0 && !selectedKidProfile) {
           setSelectedKidProfile(kidsProfiles[0]);
         }
-        router.replace('/dashboard');
-      } else if (kidsProfiles.length === 0 && currentSegment === 'select-kid') {
-        // If no kids but on select-kid, redirect to dashboard
-        router.replace('/dashboard');
+        router.replace('/(tabs)/dashboard');
       }
-      // Allow other screens (dashboard, select-kid, child-profile, bus-tracking) to stay
-      // This enables back navigation from dashboard to select-kid
+      // Allow other screens (dashboard, child-profile, bus-tracking) to stay
       // Don't force navigation away from these screens - let user navigate freely
     } else {
       // User is not authenticated - reset navigation flag and redirect to login if on protected routes
       hasHandledInitialNavigationRef.current = false;
-      const protectedRoutes = ['dashboard', 'select-kid', 'child-profile', 'bus-tracking'];
+      const protectedRoutes = ['(tabs)', 'select-kid', 'bus-tracking'];
       if (currentSegment && protectedRoutes.includes(currentSegment)) {
         router.replace('/');
       }
@@ -119,6 +127,7 @@ export default function RootLayout() {
   if (!isInitialized) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="dark" backgroundColor="#FFFFFF" />
         <SafeAreaProvider>
           <LoadingSpinner message="Loading app..." />
         </SafeAreaProvider>
@@ -128,6 +137,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" />
       <SafeAreaProvider>
         <Suspense fallback={<LoadingSpinner message="Loading app..." />}>
           <Stack
@@ -137,9 +147,7 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="index" />
-            <Stack.Screen name="select-kid" />
-            <Stack.Screen name="dashboard" />
-            <Stack.Screen name="child-profile" />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="bus-tracking" />
           </Stack>
         </Suspense>

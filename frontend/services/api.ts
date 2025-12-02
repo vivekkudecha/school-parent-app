@@ -1,7 +1,15 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert, Platform } from 'react-native';
 
 const API_BASE_URL = 'https://stage.tsis.edu.in/api';
+
+// Global logout handler - will be set by the app
+let globalLogoutHandler: (() => void) | null = null;
+
+export const setLogoutHandler = (handler: () => void) => {
+  globalLogoutHandler = handler;
+};
 
 // Create axios instance
 export const apiClient = axios.create({
@@ -10,6 +18,9 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Track if we're already showing the logout alert to prevent multiple alerts
+let isLoggingOut = false;
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
@@ -25,24 +36,54 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token refresh if needed
+// Response interceptor to handle 401 errors and auto-logout
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
+    // Handle 401 Unauthorized errors
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = await AsyncStorage.getItem('refresh_token');
       
-      if (refreshToken) {
-        try {
-          // You can implement token refresh logic here if needed
-          // For now, we'll just clear storage and redirect to login
-          await AsyncStorage.multiRemove(['access_token', 'refresh_token', 'user_data']);
-        } catch (refreshError) {
-          console.error('Token refresh error:', refreshError);
-        }
+      // Prevent multiple logout attempts
+      if (isLoggingOut) {
+        return Promise.reject(error);
+      }
+      
+      isLoggingOut = true;
+      
+      try {
+        // Clear all auth data
+        await AsyncStorage.multiRemove([
+          'access_token',
+          'refresh_token',
+          'user_data',
+          'kids_profiles',
+          'selected_kid_profile',
+        ]);
+        
+        // Show session expired alert
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please login again.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Call the global logout handler if set
+                if (globalLogoutHandler) {
+                  globalLogoutHandler();
+                }
+                isLoggingOut = false;
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+      } catch (logoutError) {
+        console.error('Error during logout:', logoutError);
+        isLoggingOut = false;
       }
     }
 
@@ -75,6 +116,16 @@ export const studentAPI = {
       return response.data;
     } catch (error) {
       console.error('Student API error:', error);
+      throw error;
+    }
+  },
+  
+  getCurrentRoute: async (admissionId: number) => {
+    try {
+      const response = await apiClient.get(`/student-current-route/${admissionId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Route API error:', error);
       throw error;
     }
   },

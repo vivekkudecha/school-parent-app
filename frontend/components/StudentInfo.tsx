@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Image,
+  TouchableOpacity,
 } from 'react-native';
-import { Phone, Book, Users, Shield, User, Mail, MapPin } from 'lucide-react-native';
+import { Phone, Book, Users, Shield, User, Mail, MapPin, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { COLORS } from '@/constants/config';
 import { StudentProfile } from '@/types';
 
@@ -26,10 +27,15 @@ export default function StudentInfo({
   allEmails = [],
   allPhones = [],
 }: StudentInfoProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   return (
     <View style={styles.studentInfoContainer}>
       {/* Student Info Section */}
-      <View style={styles.studentInfoCard}>
+      <TouchableOpacity
+        style={styles.studentInfoCard}
+        onPress={() => setIsExpanded(!isExpanded)}
+        activeOpacity={0.7}
+      >
         <View style={styles.studentInfoHeader}>
           <View style={styles.studentInfoLeft}>
             {profile.photo ? (
@@ -59,17 +65,24 @@ export default function StudentInfo({
               ) : null}
             </View>
           </View>
-          {profile.house_color && (
-            <View style={[styles.shieldIcon, { backgroundColor: profile.house_color }]}>
-              <Shield size={20} color={COLORS.background} />
-            </View>
-          )}
+          <View style={styles.headerRight}>
+            {profile.house_color && (
+              <View style={[styles.shieldIcon, { backgroundColor: profile.house_color }]}>
+                <Shield size={20} color={COLORS.background} />
+              </View>
+            )}
+            {isExpanded ? (
+              <ChevronUp size={20} color={COLORS.textLight} />
+            ) : (
+              <ChevronDown size={20} color={COLORS.textLight} />
+            )}
+          </View>
         </View>
 
         <View style={styles.academicDetailsRow}>
           <View style={styles.academicItem}>
             <Book size={16} color={COLORS.error} />
-            <Text style={styles.academicText}>Standard - {profile.grade_name}</Text>
+            <Text style={styles.academicText}>Grade - {profile.grade_name}</Text>
           </View>
           <View style={styles.academicItemSeparator} />
           <View style={styles.academicItem}>
@@ -77,10 +90,10 @@ export default function StudentInfo({
             <Text style={styles.academicText}>Division - {profile.division || 'N/A'}</Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
-      {/* Parents Info Section */}
-      {profile.perents_guardians && profile.perents_guardians.length > 0 && (
+      {/* Parents Info Section - Only show when expanded */}
+      {isExpanded && profile.perents_guardians && profile.perents_guardians.length > 0 && (
         <View style={styles.parentsInfoSection}>
           <Text style={styles.sectionTitle}>Parents Info</Text>
           {profile.perents_guardians.map((parent) => (
@@ -102,31 +115,20 @@ export default function StudentInfo({
         </View>
       )}
 
-      {/* Contact Info Section */}
-      <View style={styles.contactInfoSection}>
-        <Text style={styles.sectionTitle}>Contact Info</Text>
-        
-        {allEmails.length > 0 && (
-          <View style={styles.contactItem}>
-            <Mail size={18} color={COLORS.textLight} />
-            <Text style={styles.contactValue}>{allEmails.join(', ')}</Text>
-          </View>
-        )}
-        
-        {allPhones.length > 0 && (
-          <View style={styles.contactItem}>
-            <Phone size={18} color={COLORS.textLight} />
-            <Text style={styles.contactValue}>{allPhones.join(', ')}</Text>
-          </View>
-        )}
-        
-        {profile.address && (
-          <View style={styles.contactItem}>
-            <MapPin size={18} color={COLORS.textLight} />
-            <Text style={styles.contactValue}>{profile.address}</Text>
-          </View>
-        )}
-      </View>
+      {/* Contact Info Section - Only show when expanded */}
+      {isExpanded && profile.address && (
+        <View style={styles.contactInfoSection}>
+          <Text style={styles.sectionTitle}>Address</Text>
+
+
+          {profile.address && (
+            <View style={styles.contactItem}>
+              <MapPin size={18} color={COLORS.textLight} />
+              <Text style={styles.contactValue}>{profile.address}</Text>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -148,6 +150,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   studentInfoLeft: {
     flexDirection: 'row',
@@ -210,17 +217,17 @@ const styles = StyleSheet.create({
   academicItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex:1
+    flex: 1
   },
   academicText: {
     fontSize: 14,
     color: COLORS.text,
     fontWeight: '500',
-    marginLeft:6
+    marginLeft: 6
   },
   parentsInfoSection: {
     marginTop: 12,
-   
+
   },
   sectionTitle: {
     fontSize: 16,
