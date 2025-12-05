@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown, Bus } from 'lucide-react-native';
 import { useAuthStore } from '@/store/authStore';
 import { useChildrenStore } from '@/store/childrenStore';
 import { KidProfile } from '@/types';
@@ -74,6 +74,7 @@ export default function DashboardScreen() {
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [busLocation, setBusLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [routePath, setRoutePath] = useState<Array<{ latitude: number; longitude: number }>>([]);
+  const [estimatedTime, setEstimatedTime] = useState<number | null>(null); // in minutes
   const mapRef = useRef<MapView>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const initialDataProcessedRef = useRef<boolean>(false);
@@ -96,6 +97,13 @@ export default function DashboardScreen() {
         const route = data.routes[0];
         const polyline = route.overview_polyline?.points;
         
+        // Extract duration from the route
+        if (route.legs && route.legs.length > 0) {
+          const durationInSeconds = route.legs[0].duration?.value || 0;
+          const durationInMinutes = Math.round(durationInSeconds / 60);
+          setEstimatedTime(durationInMinutes);
+        }
+        
         if (polyline) {
           const decodedPath = decodePolyline(polyline);
           setRoutePath(decodedPath);
@@ -106,11 +114,13 @@ export default function DashboardScreen() {
         console.warn('Directions API error:', data.status, data.error_message);
         // Fallback to straight line
         setRoutePath([origin, destination]);
+        setEstimatedTime(null);
       }
     } catch (error) {
       console.error('Error fetching directions:', error);
       // Fallback to straight line
       setRoutePath([origin, destination]);
+      setEstimatedTime(null);
     } finally {
       setIsLoadingRoute(false);
     }
@@ -124,6 +134,21 @@ export default function DashboardScreen() {
       if (response.status && response.route_data) {
         setRouteData(response);
         setHasRoute(true);
+        console.log('response', JSON.stringify(response, null, 2));
+        
+        // Calculate estimated time between start and end points
+        if (response.route_data.start_point && response.point_data) {
+          await fetchDirectionsRoute(
+            {
+              latitude: response.route_data.start_point.latitude,
+              longitude: response.route_data.start_point.longitude,
+            },
+            {
+              latitude: response.point_data.latitude,
+              longitude: response.point_data.longitude,
+            }
+          );
+        }
         
         // Fit map to show all route points
         if (mapRef.current && response.full_route_data && response.full_route_data.length > 0) {
@@ -156,11 +181,13 @@ export default function DashboardScreen() {
       } else {
         setHasRoute(false);
         setRouteData(null);
+        setEstimatedTime(null);
       }
     } catch (error: any) {
       console.error('Error fetching route:', error);
       setHasRoute(false);
       setRouteData(null);
+      setEstimatedTime(null);
     } finally {
       setLoading(false);
     }
@@ -188,6 +215,7 @@ export default function DashboardScreen() {
       }
       setBusLocation(null);
       setRoutePath([]);
+      setEstimatedTime(null);
       initialDataProcessedRef.current = false;
       return;
     }
@@ -274,6 +302,7 @@ export default function DashboardScreen() {
       }
       setBusLocation(null);
       setRoutePath([]);
+      setEstimatedTime(null);
       initialDataProcessedRef.current = false;
     };
   }, [routeData?.vehicle?.register_number, routeData?.point_data]);
@@ -288,6 +317,7 @@ export default function DashboardScreen() {
       setRouteData(null);
       setBusLocation(null);
       setRoutePath([]);
+      setEstimatedTime(null);
       initialDataProcessedRef.current = false;
     }
   }, [selectedKidProfile?.admission]);
@@ -333,19 +363,19 @@ export default function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <View style={styles.container} >
+      {/* Logo Header - Normal flow, before map */}
+      <View style={styles.logoContainer}>
+        <Image
+          source={require('@/assets/images/logo.jpeg')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </View>
+
       {/* Map Container */}
       <View style={styles.mapContainer}>
-        {/* Logo Header - Absolute positioned at top */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('@/assets/images/logo.jpeg')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-
-        {/* Student Card - Absolute positioned below logo */}
+        {/* Student Card - Absolute positioned on top of map */}
         <TouchableOpacity
           style={styles.studentCard}
           onPress={() => setShowKidSelector(true)}
@@ -371,6 +401,38 @@ export default function DashboardScreen() {
               <Text style={styles.studentGrade}>
                 Grade {selectedKidProfile.grade_name}
               </Text>
+              
+              {/* Route Details - Only show when route is loaded */}
+              {hasRoute && routeData && (
+                <View style={styles.routeDetailsContainer}>
+                  {/* Estimated Time */}
+                  {estimatedTime !== null && (
+                    <View style={styles.timePill}>
+                      <Text style={styles.timePillText}>{estimatedTime} Min</Text>
+                    </View>
+                  )}
+                  
+                  {/* Bus Details */}
+                  <View style={styles.busDetailsRow}>
+                    <Bus size={16} color={COLORS.background} style={styles.busIcon} />
+                    {routeData.vehicle?.vehicle_tag && (
+                      <Text style={styles.busDetailText}>
+                        Bus #{routeData.vehicle.vehicle_tag}
+                      </Text>
+                    )}
+                    {routeData.vehicle?.register_number && (
+                      <Text style={styles.busDetailText}>
+                        Bus No : {routeData.vehicle.register_number}
+                      </Text>
+                    )}
+                  </View>
+                  
+                  {/* Seat Number */}
+                  {routeData.sheet_no && (
+                    <Text style={styles.seatText}>Seat : {routeData.sheet_no}</Text>
+                  )}
+                </View>
+              )}
             </View>
             <ChevronDown size={20} color={COLORS.background} style={styles.dropdownIcon} />
           </View>
@@ -558,6 +620,7 @@ export default function DashboardScreen() {
                         setRouteData(null);
                         setBusLocation(null);
                         setRoutePath([]);
+                        setEstimatedTime(null);
                         setLoading(false);
                         initialDataProcessedRef.current = false;
                         
@@ -607,7 +670,7 @@ export default function DashboardScreen() {
           </View>
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -617,14 +680,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   logoContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     alignItems: 'flex-start',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    zIndex: 11,
+    paddingTop: 50,
+    paddingBottom: 12,
+    backgroundColor: COLORS.background,
   },
   logo: {
     width: 131,
@@ -632,7 +692,7 @@ const styles = StyleSheet.create({
   },
   studentCard: {
     position: 'absolute',
-    top: 70,
+    top: 16,
     left: 16,
     right: 16,
     backgroundColor: COLORS.studentCardBackground,
@@ -682,6 +742,45 @@ const styles = StyleSheet.create({
   },
   studentGrade: {
     fontSize: 14,
+    color: COLORS.background,
+    opacity: 0.9,
+  },
+  routeDetailsContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  timePill: {
+    backgroundColor: '#FF9500',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  timePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  busDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  busIcon: {
+    marginRight: 6,
+  },
+  busDetailText: {
+    fontSize: 12,
+    color: COLORS.background,
+    opacity: 0.9,
+    marginRight: 8,
+  },
+  seatText: {
+    fontSize: 12,
     color: COLORS.background,
     opacity: 0.9,
   },

@@ -101,6 +101,38 @@ export const authAPI = {
     return response.data;
   },
   
+  requestOTPForPasswordReset: async (email: string) => {
+    try {
+      const response = await apiClient.post('/request-otp-for-password-forget', {
+        email,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Request OTP error:', error);
+      throw error;
+    }
+  },
+  
+  verifyOTPAndResetPassword: async (
+    email: string,
+    newPassword: string,
+    confirmPassword: string,
+    otp: string
+  ) => {
+    try {
+      const response = await apiClient.post('/verify-otp-and-forget-password', {
+        email,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+        otp,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Verify OTP and reset password error:', error);
+      throw error;
+    }
+  },
+  
   // Note: Kids profiles are included in the login response, so no separate API call is needed
   // The kids_profile array from login response is stored in AsyncStorage and used throughout the app
 };
