@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Bus, User } from 'lucide-react-native';
+import { Bus, User, Wallet } from 'lucide-react-native';
 import { COLORS } from '@/constants/config';
 
 export default function TabsLayout() {
@@ -13,7 +13,7 @@ export default function TabsLayout() {
           backgroundColor: COLORS.background,
           borderTopWidth: 1,
           borderTopColor: COLORS.border,
-          paddingHorizontal: 80,
+          paddingHorizontal: 40,
           paddingBottom: 24,
           height: 110,
           shadowColor: COLORS.shadow,
@@ -47,6 +47,15 @@ export default function TabsLayout() {
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (
             <User size={size} color={color} strokeWidth={2.5} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="fees"
+        options={{
+          title: 'Fees',
+          tabBarIcon: ({ color, size }) => (
+            <Wallet size={size} color={color} strokeWidth={2.5} />
           ),
         }}
       />

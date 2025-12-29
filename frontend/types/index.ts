@@ -47,6 +47,10 @@ export interface KidProfile {
   photo: string;
   student: number;
   admission: number;
+  acedamic_pacge_id?: number; // Typo variant from API: "acedamic_pacge_id"
+  academic_package_id?: number;
+  academic_package?: number;
+  acedmic_package?: number; // Typo variant for backward compatibility
 }
 
 export interface LoginResponse {
@@ -150,4 +154,64 @@ export interface StudentProfile {
   house_name: string;
   house_color: string;
   perents_guardians: ParentGuardian[];
+}
+
+export interface QuarterData {
+  title: string;
+  sequence: number;
+  start_month: string;
+  end_month: string;
+  total_fees: string;
+  total_paid: string;
+  total_discount: string;
+  total_reaming: string;
+}
+
+export interface FeesRecord {
+  id: number;
+  quarter_data: QuarterData[];
+  fee_group: string;
+  fees_type: string;
+  is_other_fees: boolean | string;
+  is_top_up: boolean;
+  is_deposit: boolean;
+  total_fees: string;
+  total_paid: string;
+  total_discount: string;
+  total_reaming: string;
+  created: string;
+  updated: string;
+  user: number;
+  admission: number;
+  grade: number;
+  acedmic_package: number;
+  student_fees_collection: number;
+}
+
+export interface FeesDetail {
+  fee_group: string;
+  total_amount: string;
+  total_paid: string;
+  total_discount: string;
+  total_pending: string;
+  fees_records: FeesRecord[];
+}
+
+export interface FeesData {
+  student_id: string;
+  admission_id: string;
+  academic_package_id: number;
+  student_fees_structure_year: {
+    id: number;
+    year: number;
+  };
+  grade: {
+    id: number;
+    name: string;
+  };
+  fees_detail: FeesDetail[];
+  total_fee_amount: string;
+  total_fee_paid: string;
+  total_fee_discount: string;
+  total_fee_pending: string;
 }

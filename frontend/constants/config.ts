@@ -18,6 +18,7 @@ export const COLORS = {
   info: '#1976D2',
   infoDark: '#1565C0',
   studentCardBackground: '#3864BB',
+  grey:'#C4C4C4'
 };
 
 export const DEMO_CREDENTIALS = {

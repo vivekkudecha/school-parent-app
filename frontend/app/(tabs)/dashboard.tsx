@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+     import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -75,9 +75,228 @@ export default function DashboardScreen() {
   const [busLocation, setBusLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [routePath, setRoutePath] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null); // in minutes
+  const [busSpeed, setBusSpeed] = useState<number>(0); // in km/h
+  const [busHeading, setBusHeading] = useState<number>(0); // in degrees (0-360)
+  const [waitingForFirstLocation, setWaitingForFirstLocation] = useState(false);
   const mapRef = useRef<MapView>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const initialDataProcessedRef = useRef<boolean>(false);
+
+  // Calculate distance between two coordinates using Haversine formula (in km)
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Calculate estimated time based on speed and distance
+  const calculateEstimatedTime = (
+    busLat: number,
+    busLon: number,
+    speed: number,
+    routeData: any
+  ): number | null => {
+    if (!routeData?.point_data) {
+      return null;
+    }
+
+    // Get destination based on route_type
+    let destination: { latitude: number; longitude: number } | null = null;
+    
+    if (routeData.route_type === 'pickup') {
+      // Pickup: destination is full route end point
+      if (routeData.full_route_data && routeData.full_route_data.length > 0) {
+        const lastStop = routeData.full_route_data[routeData.full_route_data.length - 1];
+        destination = {
+          latitude: lastStop.latitude,
+          longitude: lastStop.longitude,
+        };
+      }
+    } else if (routeData.route_type === 'drop') {
+      // Drop: destination is student point (point_data)
+      destination = {
+        latitude: routeData.point_data.latitude,
+        longitude: routeData.point_data.longitude,
+      };
+    }
+
+    if (!destination) {
+      return null;
+    }
+
+    // Calculate distance in km
+    const distance = calculateDistance(
+      busLat,
+      busLon,
+      destination.latitude,
+      destination.longitude
+    );
+
+    // If speed is 0 or very low (< 5 km/h), consider it as stopped
+    // Use average city speed (30 km/h) for calculation
+    const effectiveSpeed = speed > 5 ? speed : 30;
+
+    // Calculate time in hours, then convert to minutes
+    const timeInHours = distance / effectiveSpeed;
+    const timeInMinutes = Math.round(timeInHours * 60);
+
+    // If speed is 0 or very low, return null to show "Stopped" or similar
+    if (speed <= 5) {
+      return null; // Will be handled in UI to show "Stopped" or "Not moving"
+    }
+
+    return timeInMinutes;
+  };
+
+  // Calculate bearing (direction) from point A to point B in degrees (0-360)
+  // Returns bearing where 0° is North, 90° is East, 180° is South, 270° is West
+  const calculateBearing = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number => {
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const lat1Rad = lat1 * (Math.PI / 180);
+    const lat2Rad = lat2 * (Math.PI / 180);
+
+    const y = Math.sin(dLon) * Math.cos(lat2Rad);
+    const x =
+      Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+      Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+
+    let bearing = Math.atan2(y, x) * (180 / Math.PI);
+    bearing = (bearing + 360) % 360; // Normalize to 0-360
+
+    return bearing;
+  };
+
+  // Project a point onto the nearest point on a line segment
+  // Returns the closest point on the route line to the bus location
+  const projectPointOntoRoute = (
+    busLat: number,
+    busLon: number,
+    route: Array<{ latitude: number; longitude: number }>
+  ): { latitude: number; longitude: number } | null => {
+    if (route.length < 2) {
+      return null;
+    }
+
+    let minDistance = Infinity;
+    let closestPoint: { latitude: number; longitude: number } | null = null;
+
+    // Check each segment of the route
+    for (let i = 0; i < route.length - 1; i++) {
+      const p1 = route[i];
+      const p2 = route[i + 1];
+
+      // Vector from p1 to p2
+      const dx = p2.longitude - p1.longitude;
+      const dy = p2.latitude - p1.latitude;
+      const segmentLengthSq = dx * dx + dy * dy;
+
+      if (segmentLengthSq === 0) {
+        // Points are the same, just use p1
+        const dist = calculateDistance(busLat, busLon, p1.latitude, p1.longitude);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestPoint = p1;
+        }
+        continue;
+      }
+
+      // Vector from p1 to bus point
+      const busDx = busLon - p1.longitude;
+      const busDy = busLat - p1.latitude;
+
+      // Project bus point onto the line segment
+      const t = Math.max(0, Math.min(1, (busDx * dx + busDy * dy) / segmentLengthSq));
+
+      // Calculate the projected point
+      const projectedLat = p1.latitude + t * dy;
+      const projectedLon = p1.longitude + t * dx;
+
+      // Calculate distance from bus to projected point
+      const dist = calculateDistance(busLat, busLon, projectedLat, projectedLon);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestPoint = { latitude: projectedLat, longitude: projectedLon };
+      }
+    }
+
+    return closestPoint;
+  };
+
+  // Calculate bus rotation angle based on route direction or GPS heading
+  // The bus icon faces left (west) by default, so we need to adjust the rotation
+  const calculateBusRotation = (): number => {
+    let rotation = 0;
+
+    if (!busLocation) {
+      rotation = busHeading;
+    } else if (routePath.length > 1) {
+      // Try to use route direction if available
+      // Find the closest point on the route to the bus
+      let closestIndex = 0;
+      let minDistance = Infinity;
+
+      routePath.forEach((point, index) => {
+        const dist = calculateDistance(
+          busLocation.latitude,
+          busLocation.longitude,
+          point.latitude,
+          point.longitude
+        );
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIndex = index;
+        }
+      });
+
+      // Get the next point on the route (or destination if at end)
+      const nextIndex = Math.min(closestIndex + 1, routePath.length - 1);
+      const nextPoint = routePath[nextIndex];
+
+      // Calculate bearing from bus to next point
+      const routeBearing = calculateBearing(
+        busLocation.latitude,
+        busLocation.longitude,
+        nextPoint.latitude,
+        nextPoint.longitude
+      );
+
+      // Use route bearing if GPS heading is 0 or seems unreliable
+      if (busHeading === 0 || busSpeed < 5) {
+        rotation = routeBearing;
+      } else {
+        // Use GPS heading if available and bus is moving
+        rotation = busHeading;
+      }
+    } else {
+      // Fall back to GPS heading
+      rotation = busHeading;
+    }
+
+    // Adjust rotation: bus icon faces left (west) by default in the image
+    // In react-native-maps, rotation is clockwise from north
+    // If icon faces west (left) by default, to make it point north we rotate +90°
+    // So for a given heading, we add 90° to align the icon
+    return (rotation + 90) % 360;
+  };
 
   // Fetch route from Google Directions API
   const fetchDirectionsRoute = async (
@@ -86,6 +305,7 @@ export default function DashboardScreen() {
   ) => {
     try {
       setIsLoadingRoute(true);
+      
       const originStr = `${origin.latitude},${origin.longitude}`;
       const destinationStr = `${destination.latitude},${destination.longitude}`;
       const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${originStr}&destination=${destinationStr}&key=${GOOGLE_MAPS_API_KEY}`;
@@ -97,7 +317,7 @@ export default function DashboardScreen() {
         const route = data.routes[0];
         const polyline = route.overview_polyline?.points;
         
-        // Extract duration from the route
+        // Extract duration from the route (initial estimate, will be overridden by speed-based calculation when bus location is available)
         if (route.legs && route.legs.length > 0) {
           const durationInSeconds = route.legs[0].duration?.value || 0;
           const durationInMinutes = Math.round(durationInSeconds / 60);
@@ -106,20 +326,20 @@ export default function DashboardScreen() {
         
         if (polyline) {
           const decodedPath = decodePolyline(polyline);
+          // Set actual route path from Google Directions API
           setRoutePath(decodedPath);
           console.log('Directions route fetched and decoded:', decodedPath.length, 'points');
           return decodedPath;
         }
       } else {
-        console.warn('Directions API error:', data.status, data.error_message);
-        // Fallback to straight line
-        setRoutePath([origin, destination]);
+        // Clear route path on error - no fallback
+        setRoutePath([]);
         setEstimatedTime(null);
       }
     } catch (error) {
       console.error('Error fetching directions:', error);
-      // Fallback to straight line
-      setRoutePath([origin, destination]);
+      // Clear route path on error - no fallback
+      setRoutePath([]);
       setEstimatedTime(null);
     } finally {
       setIsLoadingRoute(false);
@@ -134,8 +354,7 @@ export default function DashboardScreen() {
       if (response.status && response.route_data) {
         setRouteData(response);
         setHasRoute(true);
-        console.log('response', JSON.stringify(response, null, 2));
-        
+        console.log('Route data:', JSON.stringify(response, null, 2));
         // Calculate estimated time between start and end points
         if (response.route_data.start_point && response.point_data) {
           await fetchDirectionsRoute(
@@ -214,14 +433,20 @@ export default function DashboardScreen() {
         wsRef.current = null;
       }
       setBusLocation(null);
+      setBusSpeed(0);
+      setBusHeading(0);
       setRoutePath([]);
       setEstimatedTime(null);
       initialDataProcessedRef.current = false;
+      setWaitingForFirstLocation(false);
       return;
     }
 
-    // Reset initial data flag when route changes
+    // Reset initial data flag when route changes and set waiting state
     initialDataProcessedRef.current = false;
+    setWaitingForFirstLocation(true);
+    setBusLocation(null);
+    setRoutePath([]);
 
     // Extract registration number and remove dashes
     const registrationNumber = routeData.vehicle.register_number.replace(/-/g, '');
@@ -249,7 +474,33 @@ export default function DashboardScreen() {
               longitude: parseFloat(data.longitude),
             };
             console.log('Updating bus location from location_update:', newLocation);
+            const isFirstLocation = !busLocation;
             setBusLocation(newLocation);
+            
+            // Clear route path on first location to show loader until new route is fetched
+            if (isFirstLocation) {
+              setRoutePath([]);
+            }
+            
+            // Extract and update speed (convert to number, default to 0)
+            const speed = parseFloat(data.speed || '0');
+            setBusSpeed(speed);
+            
+            // Extract and update heading (convert to number, default to 0)
+            const heading = parseFloat(data.heading || '0');
+            console.log('Bus heading from location_update:', heading);
+            setBusHeading(heading);
+            
+            // Calculate estimated time based on speed and distance
+            if (routeData) {
+              const estimatedTimeFromSpeed = calculateEstimatedTime(
+                newLocation.latitude,
+                newLocation.longitude,
+                speed,
+                routeData
+              );
+              setEstimatedTime(estimatedTimeFromSpeed);
+            }
             
             // Fetch directions route when bus location updates
             if (routeData?.point_data) {
@@ -257,6 +508,10 @@ export default function DashboardScreen() {
                 latitude: routeData.point_data.latitude,
                 longitude: routeData.point_data.longitude,
               });
+              // After route is fetched, clear waiting state if this was first location
+              if (isFirstLocation) {
+                setWaitingForFirstLocation(false);
+              }
             }
           }
         } else if (data?.type === 'initial_data' && Array.isArray(data.data) && !initialDataProcessedRef.current) {
@@ -271,7 +526,29 @@ export default function DashboardScreen() {
             };
             console.log('Setting initial bus location from initial_data (first time):', newLocation);
             setBusLocation(newLocation);
+            // Clear route path on first location to show loader until new route is fetched
+            setRoutePath([]);
             initialDataProcessedRef.current = true; // Mark as processed
+            
+            // Extract and update speed (convert to number, default to 0)
+            const speed = parseFloat(vehicleData.speed || '0');
+            setBusSpeed(speed);
+            
+            // Extract and update heading (convert to number, default to 0)
+            const heading = parseFloat(vehicleData.heading || '0');
+            console.log('Bus heading from initial_data:', heading);
+            setBusHeading(heading);
+            
+            // Calculate estimated time based on speed and distance
+            if (routeData) {
+              const estimatedTimeFromSpeed = calculateEstimatedTime(
+                newLocation.latitude,
+                newLocation.longitude,
+                speed,
+                routeData
+              );
+              setEstimatedTime(estimatedTimeFromSpeed);
+            }
             
             // Fetch directions route when initial location is set
             if (routeData?.point_data) {
@@ -279,6 +556,8 @@ export default function DashboardScreen() {
                 latitude: routeData.point_data.latitude,
                 longitude: routeData.point_data.longitude,
               });
+              // After route is fetched, clear waiting state
+              setWaitingForFirstLocation(false);
             }
           }
         }
@@ -301,21 +580,25 @@ export default function DashboardScreen() {
         wsRef.current = null;
       }
       setBusLocation(null);
+      setBusSpeed(0);
+      setBusHeading(0);
       setRoutePath([]);
       setEstimatedTime(null);
       initialDataProcessedRef.current = false;
+      setWaitingForFirstLocation(false);
     };
   }, [routeData?.vehicle?.register_number, routeData?.point_data]);
 
   // Fetch route once when selected kid changes (no polling)
   useEffect(() => {
-    console.log('selectedKidProfile', selectedKidProfile);
     if (selectedKidProfile?.admission) {
       fetchRoute(selectedKidProfile.admission);
     } else {
       setHasRoute(false);
       setRouteData(null);
       setBusLocation(null);
+      setBusSpeed(0);
+      setBusHeading(0);
       setRoutePath([]);
       setEstimatedTime(null);
       initialDataProcessedRef.current = false;
@@ -401,31 +684,40 @@ export default function DashboardScreen() {
               <Text style={styles.studentGrade}>
                 Grade {selectedKidProfile.grade_name}
               </Text>
-              
+            
+            </View>
+            <ChevronDown size={20} color={COLORS.background} style={styles.dropdownIcon} />
+         
+          </View>
+            
               {/* Route Details - Only show when route is loaded */}
               {hasRoute && routeData && (
                 <View style={styles.routeDetailsContainer}>
                   {/* Estimated Time */}
-                  {estimatedTime !== null && (
+                  {busLocation && (                    
                     <View style={styles.timePill}>
-                      <Text style={styles.timePillText}>{estimatedTime} Min</Text>
+                      <Text style={styles.timePillText}>
+                        {busSpeed <= 5 ? 'Stopped' : estimatedTime !== null ? `${estimatedTime} Min` : 'Calculating...'}
+                      </Text>
                     </View>
                   )}
                   
-                  {/* Bus Details */}
-                  <View style={styles.busDetailsRow}>
-                    <Bus size={16} color={COLORS.background} style={styles.busIcon} />
-                    {routeData.vehicle?.vehicle_tag && (
-                      <Text style={styles.busDetailText}>
-                        Bus #{routeData.vehicle.vehicle_tag}
-                      </Text>
-                    )}
-                    {routeData.vehicle?.register_number && (
-                      <Text style={styles.busDetailText}>
-                        Bus No : {routeData.vehicle.register_number}
-                      </Text>
-                    )}
-                  </View>
+                  {/* Bus Icon */}
+                  <Bus size={16} color={COLORS.background} style={styles.busIcon} />
+                  
+                  {/* Bus Tag */}
+                  {routeData.vehicle?.vehicle_tag && (
+                    <Text style={styles.busDetailText}>
+                      Bus #{routeData.vehicle.vehicle_tag}
+                    </Text>
+                  )}
+                  
+                  {/* Bus Number */}
+                  {routeData.vehicle?.register_number && (
+                    <Text style={styles.busDetailText}>
+                      Bus No : {routeData.vehicle.register_number}
+                    </Text>
+                  )}
                   
                   {/* Seat Number */}
                   {routeData.sheet_no && (
@@ -433,9 +725,6 @@ export default function DashboardScreen() {
                   )}
                 </View>
               )}
-            </View>
-            <ChevronDown size={20} color={COLORS.background} style={styles.dropdownIcon} />
-          </View>
         </TouchableOpacity>
         <MapView
           ref={mapRef}
@@ -462,7 +751,7 @@ export default function DashboardScreen() {
                   key={`route-${busLocation ? `${busLocation.latitude}-${busLocation.longitude}` : 'default'}-${routePath.length}`}
                   coordinates={routePath}
                   strokeColor="#007AFF"
-                  strokeWidth={5}
+                  strokeWidth={4}
                   lineCap="round"
                   lineJoin="round"
                   geodesic={true}
@@ -470,43 +759,97 @@ export default function DashboardScreen() {
               )}
               
               {/* Start Point Marker (Bus) - from WebSocket location, updates in real-time */}
-              {(busLocation || routeData.point_data) && (
-                <Marker
-                  key={`bus-${busLocation ? `${busLocation.latitude}-${busLocation.longitude}` : 'default'}`}
-                  coordinate={
-                    busLocation || {
-                      latitude: routeData.point_data.latitude,
-                      longitude: routeData.point_data.longitude,
-                    }
-                  }
-                  title="Bus Location"
-                  description="Current bus position"
-                  anchor={{ x: 0.5, y: 0.5 }}
-                >
-                  <Image
-                    source={require('@/assets/images/map-bus.png')}
-                    style={styles.busMarker}
-                    resizeMode="contain"
-                  />
-                </Marker>
-              )}
-              
-              {/* End Point Marker - from point_data */}
-              <Marker
-                coordinate={{
+              {(busLocation || routeData.point_data) && (() => {
+                // Snap bus location to nearest point on route if route is available
+                let markerCoordinate = busLocation || {
                   latitude: routeData.point_data.latitude,
                   longitude: routeData.point_data.longitude,
-                }}
-                title={routeData.point_data.stop_title}
-                description={routeData.point_data.area}
-                anchor={{ x: 0.5, y: 1 }}
-              >
-                <Image
-                  source={require('@/assets/images/map-drop-point.png')}
-                  style={styles.dropPointMarker}
-                  resizeMode="contain"
-                />
-              </Marker>
+                };
+
+                if (busLocation && routePath.length > 1) {
+                  const projectedPoint = projectPointOntoRoute(
+                    busLocation.latitude,
+                    busLocation.longitude,
+                    routePath
+                  );
+                  // Use projected point if it's close to the route (within reasonable distance)
+                  if (projectedPoint) {
+                    const distanceToRoute = calculateDistance(
+                      busLocation.latitude,
+                      busLocation.longitude,
+                      projectedPoint.latitude,
+                      projectedPoint.longitude
+                    );
+                    // Only snap if within 100 meters of the route
+                    if (distanceToRoute < 0.1) {
+                      markerCoordinate = projectedPoint;
+                    }
+                  }
+                }
+
+                return (
+                  <Marker
+                    key={`bus-${markerCoordinate.latitude}-${markerCoordinate.longitude}-${busHeading}`}
+                    coordinate={markerCoordinate}
+                    title="Bus Location"
+                    description={`Current bus position - Heading: ${busHeading}°`}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                    flat={true}
+                    rotation={calculateBusRotation()}
+                  >
+                    <Image
+                      source={require('@/assets/images/map-bus.png')}
+                      style={styles.busMarker}
+                      resizeMode="contain"
+                    />
+                  </Marker>
+                );
+              })()}
+              
+              {/* End Point Marker - from point_data */}
+              {(() => {
+                // Snap drop point to nearest point on route if route is available
+                let markerCoordinate = {
+                  latitude: routeData.point_data.latitude,
+                  longitude: routeData.point_data.longitude,
+                };
+
+                if (routePath.length > 1) {
+                  const projectedPoint = projectPointOntoRoute(
+                    routeData.point_data.latitude,
+                    routeData.point_data.longitude,
+                    routePath
+                  );
+                  // Use projected point if it's close to the route (within reasonable distance)
+                  if (projectedPoint) {
+                    const distanceToRoute = calculateDistance(
+                      routeData.point_data.latitude,
+                      routeData.point_data.longitude,
+                      projectedPoint.latitude,
+                      projectedPoint.longitude
+                    );
+                    // Only snap if within 200 meters of the route
+                    if (distanceToRoute < 0.2) {
+                      markerCoordinate = projectedPoint;
+                    }
+                  }
+                }
+
+                return (
+                  <Marker
+                    coordinate={markerCoordinate}
+                    title={routeData.point_data.stop_title}
+                    description={routeData.point_data.area}
+                    anchor={{ x: 0.5, y: 1 }}
+                  >
+                    <Image
+                      source={require('@/assets/images/map-drop-point.png')}
+                      style={styles.dropPointMarker}
+                      resizeMode="contain"
+                    />
+                  </Marker>
+                );
+              })()}
             </>
           )}
           
@@ -571,12 +914,14 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Route Loading Overlay - show when hasRoute is true and isLoadingRoute is false */}
-        {hasRoute && !isLoadingRoute && routePath.length === 0 && (
+        {/* Route Loading Overlay - show when waiting for first location or loading route */}
+        {hasRoute && (waitingForFirstLocation || isLoadingRoute || (busLocation && routePath.length === 0)) && (
           <View style={styles.routeLoadingOverlay}>
             <View style={styles.routeLoadingContainer}>
               <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.routeLoadingText}>Loading route...</Text>
+              <Text style={styles.routeLoadingText}>
+                {waitingForFirstLocation ? 'Waiting for bus location...' : 'Loading route...'}
+              </Text>
             </View>
           </View>
         )}
@@ -619,6 +964,8 @@ export default function DashboardScreen() {
                         setHasRoute(false);
                         setRouteData(null);
                         setBusLocation(null);
+                        setBusSpeed(0);
+                        setBusHeading(0);
                         setRoutePath([]);
                         setEstimatedTime(null);
                         setLoading(false);
@@ -698,7 +1045,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.studentCardBackground,
     borderRadius: 16,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     shadowColor: COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -750,25 +1097,21 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   timePill: {
     backgroundColor: '#FF9500',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
+    marginRight: 8,
   },
   timePillText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#FFFFFF',
-  },
-  busDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    flexWrap: 'wrap',
   },
   busIcon: {
     marginRight: 6,

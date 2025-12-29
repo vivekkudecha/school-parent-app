@@ -98,6 +98,7 @@ export const authAPI = {
       username,
       password,
     });
+    console.log('Login response:', response.data);
     return response.data;
   },
   
@@ -158,6 +159,67 @@ export const studentAPI = {
       return response.data;
     } catch (error) {
       console.error('Route API error:', error);
+      throw error;
+    }
+  },
+  
+  getFeesData: async (studentId: number, admissionId: number, academicPackageId: number) => {
+    try {
+      const response = await apiClient.get(`/student-fees-data-quarter-wise`, {
+        params: {
+          student: studentId,
+          admission: admissionId,
+          academic_package: academicPackageId,
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Fees API error:', error);
+      
+      // Log detailed error information
+      if (error.response) {
+        // Server responded with error status
+        console.error('Fees API - Response status:', error.response.status);
+        console.error('Fees API - Response data:', error.response.data);
+        console.error('Fees API - Request URL:', error.config?.url);
+        console.error('Fees API - Request params:', {
+          student: studentId,
+          admission: admissionId,
+          academic_package: academicPackageId,
+        });
+        
+        // Extract error message from response
+        let errorMessage = 'Failed to fetch fees data';
+        if (error.response.data) {
+          if (typeof error.response.data === 'string') {
+            errorMessage = error.response.data;
+          } else if (error.response.data.detail) {
+            errorMessage = Array.isArray(error.response.data.detail)
+              ? error.response.data.detail.map((item: any) => 
+                  typeof item === 'object' && item.msg ? item.msg : String(item)
+                ).join(', ')
+              : String(error.response.data.detail);
+          } else if (error.response.data.message) {
+            errorMessage = error.response.data.message;
+          } else if (error.response.data.error) {
+            errorMessage = error.response.data.error;
+          }
+        }
+        console.error('Fees API - Error message:', errorMessage);
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error('Fees API - No response received:', error.request);
+        console.error('Fees API - Request URL:', error.config?.url);
+        console.error('Fees API - Request params:', {
+          student: studentId,
+          admission: admissionId,
+          academic_package: academicPackageId,
+        });
+      } else {
+        // Error setting up the request
+        console.error('Fees API - Request setup error:', error.message);
+      }
+      
       throw error;
     }
   },
